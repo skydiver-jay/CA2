@@ -69,7 +69,7 @@ phase_num = 3
 stack_kernel_9 = gkern(9, 3)
 stack_kernel_11 = gkern(11, 3)
 
-model_checkpoint_map = {
+model_checkpoint_map = {  # 本地预训练模型文件的存储路径
     'inception_v3': os.path.join(FLAGS.checkpoint_path, 'inception_v3.ckpt'),
     'adv_inception_v3': os.path.join(FLAGS.checkpoint_path, 'adv_inception_v3_rename.ckpt'),
     'ens3_adv_inception_v3': os.path.join(FLAGS.checkpoint_path, 'ens3_adv_inception_v3_rename.ckpt'),
