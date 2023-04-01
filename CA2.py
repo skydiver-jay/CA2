@@ -36,6 +36,10 @@ tf.flags.DEFINE_float('prob', 0.7, 'probability of using diverse inputs.')
 
 tf.flags.DEFINE_integer('image_resize', 331, 'Height of each input images.')
 
+"""
+sample_num：
+    增加不同类型噪声的数量，属于CA2框架“偏移增强”特性的一个参数。 文章中的k，生成增强数据的数量，也即是随机采样的数量。
+"""
 tf.flags.DEFINE_integer('sample_num', 4, 'the size of gradient.')
 
 tf.flags.DEFINE_float('sample_variance', 0.1, 'the size of gradient.')
@@ -102,6 +106,21 @@ def inceptionv4_model(x):
 
 
 def inceptionresnetv2_model(x):
+    """
+
+    Args:
+        x: 为inception_resnet_v2()的inputs参数，a 4-D tensor of size [batch_size, height, width, 3]。
+            应该就是图像张量。
+
+    Returns: 为inception_resnet_v2()的结果，logits & end_points。
+            logits
+                相对好理解一些：在机器学习中，logits是指模型的输出，但没有经过softmax或sigmoid等激活函数的变量。它们通常用于计算损失函数，
+                而不是直接用于预测。在分类问题中，logits通常是一个向量，每个元素对应一个类别。
+            end_points：
+                the set of end_points from the inception model。
+                还没完全理解。
+
+    """
     with slim.arg_scope(inception_resnet_v2.inception_resnet_v2_arg_scope()):
         logits_res_v2, end_points_res_v2 = inception_resnet_v2.inception_resnet_v2(
             x, num_classes=1001, is_training=False, reuse=tf.AUTO_REUSE)
@@ -109,10 +128,24 @@ def inceptionresnetv2_model(x):
 
 
 def resnet50_model(x):
+    """
+
+    Args:
+        x: 为resnet_v2()的inputs参数，A tensor of size [batch, height_in, width_in, channels]。
+
+    Returns: 直接return了resnet_v2()的结果，net & end_points。
+
+            end_points: A dictionary from components of the network to the corresponding
+                activation. //在TensorFlow中，end_points是指在模型中的某些位置收集的张量。这些张量可以用于可视化、调试或其他目的。
+
+    注: 如果要集成到Ditto中，这里的常量num_classes（针对ImageNet数据集），需要变为变量。
+
+    """
     with slim.arg_scope(resnet_v2.resnet_arg_scope()):
         logits_resnet, end_points_resnet = resnet_v2.resnet_v2_50(
             x, num_classes=1001, is_training=False, reuse=tf.AUTO_REUSE)
     return logits_resnet, end_points_resnet
+
 
 def resnet152_model(x):
     with slim.arg_scope(resnet_v2.resnet_arg_scope()):
@@ -148,7 +181,6 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
     num = tf.constant(0)
     _, _, _, _, noise = tf.while_loop(grad_finish, compute_grads,
                                       [x, x_ini, one_hot, num, tf.zeros_like(x)])
-
 
     noise = tf.nn.depthwise_conv2d(noise, stack_kernel, strides=[1, 1, 1, 1], padding='SAME')
     noise = noise / tf.reduce_mean(tf.abs(noise), [1, 2, 3], keep_dims=True)
@@ -266,3 +298,16 @@ def main(_):
 
 if __name__ == '__main__':
     tf.app.run()
+
+
+"""
+
+the logits outputs of the model:
+    在机器学习中，logits是指模型的输出，但没有经过softmax或sigmoid等激活函数的变量。它们通常用于计算损失函数，而不是直接用于预测。在分类问题中，
+    logits通常是一个向量，每个元素对应一个类别。
+
+the set of end_points from the inception model:  
+    在TensorFlow中，end_points是指在模型中的某些位置收集的张量。这些张量可以用于可视化、调试或其他目的。在Inception模型中，
+    end_points包括每个Inception模块的输出，以及最终的logits输出。
+
+"""
