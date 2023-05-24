@@ -30,11 +30,12 @@ tf.flags.DEFINE_float('max_epsilon', 12.0, 'max epsilon.')
 # 动量衰减系数/动量衰减权重
 tf.flags.DEFINE_float('momentum', 1.0, 'momentum about the model.')
 
+# 由于当前代码中的本地白盒模型设置为I3，所以image_width、image_height、image_resize几个参数与为适配I3模型的值
 tf.flags.DEFINE_integer('image_width', 299, 'Width of each input images.')
 
 tf.flags.DEFINE_integer('image_height', 299, 'Height of each input images.')
 
-# 后续没有用到的全局变量
+# 后续没有用到的全局变量，目前推出时SIM算法中使用的一个参数
 tf.flags.DEFINE_float('prob', 0.7, 'probability of using diverse inputs.')
 
 tf.flags.DEFINE_integer('image_resize', 331, 'Height of each input images.')
@@ -85,7 +86,7 @@ phase_num = 3
 
 """
 配置卷积核尺寸分别为9和11的两个高斯卷积矩阵
-文章中结论：选择卷积核尺寸集合为 {1,9,11}，默认情况下建议使用此配置；当卷积核尺寸为1时，实则为原模型，这个下后续全局梯度计算相关代码中有体现
+文章中结论：选择卷积核尺寸集合为 {1,9,11}，默认情况下建议使用此配置；当卷积核尺寸为1时，实则为原模型不变，这个在后续全局梯度计算相关代码中有体现
 """
 # kernel size of cyclical augmentation (self-ensemble policy)
 stack_kernel = gkern(1, 1)
@@ -94,14 +95,14 @@ stack_kernel_11 = gkern(11, 3)
 
 # 本地预训练模型文件的绝对路径
 model_checkpoint_map = {
-    'inception_v3': os.path.join(FLAGS.checkpoint_path, 'inception_v3.ckpt'),
+    'inception_v3': os.path.join(FLAGS.checkpoint_path, 'inception_v3.ckpt'),   # 即i3
     'adv_inception_v3': os.path.join(FLAGS.checkpoint_path, 'adv_inception_v3_rename.ckpt'),
     'ens3_adv_inception_v3': os.path.join(FLAGS.checkpoint_path, 'ens3_adv_inception_v3_rename.ckpt'),
     'ens4_adv_inception_v3': os.path.join(FLAGS.checkpoint_path, 'ens4_adv_inception_v3_rename.ckpt'),
-    'inception_v4': os.path.join(FLAGS.checkpoint_path, 'inception_v4.ckpt'),
-    'inception_resnet_v2': os.path.join(FLAGS.checkpoint_path, 'inception_resnet_v2_2016_08_30.ckpt'),
+    'inception_v4': os.path.join(FLAGS.checkpoint_path, 'inception_v4.ckpt'),   # 即i4
+    'inception_resnet_v2': os.path.join(FLAGS.checkpoint_path, 'inception_resnet_v2_2016_08_30.ckpt'),  # 即ir2
     'ens_adv_inception_resnet_v2': os.path.join(FLAGS.checkpoint_path, 'ens_adv_inception_resnet_v2_rename.ckpt'),
-    'resnet_v2': os.path.join(FLAGS.checkpoint_path, 'resnet_v2_50.ckpt'),
+    'resnet_v2': os.path.join(FLAGS.checkpoint_path, 'resnet_v2_50.ckpt'),  # 即r50
     'densenet': os.path.join(FLAGS.checkpoint_path, 'tf-densenet161.ckpt')}
 
 
@@ -247,12 +248,17 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
     # ？？为什么这里的扰动需要做一次尺寸为1的高斯卷积运算？？
     noise = tf.nn.depthwise_conv2d(noise, stack_kernel, strides=[1, 1, 1, 1], padding='SAME')
 
-    # 和cleverhans中的MIM算法实现一样，使用的是reduce_mean()，而非MIM算法原文中的计算L1范数
-    # 此处noise最终为根据动量优化策略计算当前迭代的循环优化梯度g
+    # 和cleverhans中的MIM算法实现一样，使用的是reduce_mean()，而非MIM算法原文中的计算L1范数 \
+    #   此处noise最终为根据动量优化策略计算当前迭代的循环优化梯度g，momentum就是速度衰减权重μ
+    # 循环优化的一个关键点：知识蒸馏，存在一个学习权重β参数，在每个循环优化阶段的初始迭代中，前序迭代的g需要乘以β后再进行后续的迭代累加 \
+    #   但是由于文中实验表明，优选的β值为1.0，所以这里在代码实现中没有体现出来这个关键点。后续迁移至tf2，建议体现出该配置，也便于理解算法思想。
     noise = noise / tf.reduce_mean(tf.abs(noise), [1, 2, 3], keep_dims=True)
     noise = momentum * grad + noise
 
     # 更新当前循环优化阶段当前迭代的样本x
+    # 循环优化的另一个关键点：在每个循环优化阶段的初始迭代中，计算得到的循环优化梯度g重新施加在初始图像张量x上 \
+    #   这一点在该函数中未体现，该函数只呈现单个迭代逻辑，总是将当前迭代计算的g施加在入参样本x上，至于循环优化关键点由main()中循环优化阶段 \
+    #   的for循环中特别注意每个循环传入的入参x必须为原始图像张量
     x = x + alpha * tf.sign(noise)
 
     # 控制样本中间结果不超出全局最大扰动约束
@@ -377,7 +383,8 @@ def main(_):
                                                              [x_input, x_ini, y, i, iternum, x_max, x_min, grad])
 
         # Run computation
-        # ？？
+        # 实例化多个Saver实例，用于后面在session中加载模型；关于tf.train.Saver()可参考https://zhuanlan.zhihu.com/p/474395332
+        # 关于slim.get_model_variables()可参考https://cloud.tencent.com/developer/article/1496625
         s1 = tf.train.Saver(slim.get_model_variables(scope='InceptionV3'))
         s2 = tf.train.Saver(slim.get_model_variables(scope='InceptionV4'))
         s3 = tf.train.Saver(slim.get_model_variables(scope='InceptionResnetV2'))
@@ -385,7 +392,7 @@ def main(_):
 
         with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
-            # ？？
+            # 加载多个本地预训练模型
             s1.restore(sess, model_checkpoint_map['inception_v3'])
             s2.restore(sess, model_checkpoint_map['inception_v4'])
             s3.restore(sess, model_checkpoint_map['inception_resnet_v2'])
@@ -406,7 +413,10 @@ def main(_):
                 for k in range(phase_num):
                     # iter_num设置为当前循环优化阶段的迭代数，phase_step为一个全局配置，各循环优化阶段的迭代数
                     iter_num = phase_step[k]
-                    # curr_iternum目前推测为当前循环优化阶段的当前迭代控制变量，即curr_iternum == iter_num时退出当前循环优化阶段，由stop()判断
+                    # curr_iternum目前推测为当前循环优化阶段的当前迭代控制变量，即curr_iternum == iter_num时退出当前循环优化阶段 \
+                    #   判断逻辑在stop()中实现
+                    # 循环优化的其中一个关键点，每个循环优化阶段初始迭代，循环优化梯度g重新施加在初始图像上 \
+                    #   该关键点由此处每次循环时，x_input均固定设置为images来保证。
                     adv_images, adv_grad, curr_iternum = sess.run([x_adv, noise, inumber],
                                                                   feed_dict={x_input: images,
                                                                              x_ini: images,
@@ -431,4 +441,9 @@ the set of end_points from the inception model:
     在TensorFlow中，end_points是指在模型中的某些位置收集的张量。这些张量可以用于可视化、调试或其他目的。在Inception模型中，
     end_points包括每个Inception模块的输出，以及最终的logits输出。
 
+"""
+
+"""
+Tensorflow读取并使用预训练模型：以inception_v3为例
+https://blog.csdn.net/AManFromEarth/article/details/79155926
 """
