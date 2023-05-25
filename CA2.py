@@ -43,7 +43,8 @@ tf.flags.DEFINE_integer('image_resize', 331, 'Height of each input images.')
 
 """
 sample_num: 属于CA2框架“偏移增强”特性的一个参数。 文章中的k，生成偏移增强样本的数量，也即是随机采样的数量。
-sample_variance: 为偏移距离，即文章中的ω，文章中实验设置为0.05，此处设置为0.1，待确认哪个是默认推荐配置？？
+sample_variance: 为偏移距离，即文章中的ω，文章中实验设置为0.05，此处设置为0.1，待确认哪个是默认推荐配置
+    这个疑问黄博已解答，见《几个代码疑问.docx》之问题1
 """
 tf.flags.DEFINE_integer('sample_num', 4, 'the number of samples for SA.')
 
@@ -70,7 +71,8 @@ tf.set_random_seed(0)
 random.seed(0)
 
 # 配置本地白盒模型网络类型
-# 如果想和文章中“集成模型攻击实验”一样，同时攻击4中本地预训练模型，该如何配置？？
+# 如果想和文章中“集成模型攻击实验”一样，同时攻击4中本地预训练模型，该如何配置
+#   这个疑问黄博已解答，见《几个代码疑问.docx》之问题2
 # select victim model from i3, i4, ir2, r50
 model = 'i3'
 
@@ -112,7 +114,7 @@ def check_or_create_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-
+# 文章实验中选了1000张图，但这里num_classes设置为1001，黄博解答：因为还有一个背景类
 def inceptionv3_model(x):
     with slim.arg_scope(inception_v3.inception_v3_arg_scope()):
         logits_v3, end_points_v3 = inception_v3.inception_v3(
@@ -220,7 +222,8 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
         元组--x, x_ini, y, i, iternum, x_max, x_min, noise
     """
 
-    # 设置最大扰动约束：2*12/255 ？， 文章中不是提到是 12/255吗？
+    # 设置最大扰动约束：2*12/255 ， 文章中不是提到是 12/255吗
+    #   这个疑问黄博已解答，见《几个代码疑问.docx》之问题1/3
     eps = 2.0 * FLAGS.max_epsilon / 255.0
 
     # 设置当前阶段的步长，即文章中的 α = e/N(t)
@@ -234,7 +237,8 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
     # 获取初始图像张量的模型输出，model为模型网络类型配置，是一个全局配置
     logits_ini, end_points_ini = get_logits(x_ini, model)
 
-    # ？？？
+    # 关于one_hot的疑问黄博已解答，见《几个代码疑问.docx》之问题5
+    # end_points包含模型每一层的输出，其中也包含了倒数第二层的输出即logits，其中最后一层输出层叫prediction，prediction就是把logits归一化
     pred = tf.argmax(end_points_ini['Predictions'], 1)
     first_round = tf.cast(tf.equal(i, 0), tf.int64)
     y = first_round * pred[:y.shape[0]] + (1 - first_round) * y
@@ -246,7 +250,8 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
     _, _, _, _, noise = tf.while_loop(grad_finish, compute_grads,
                                       [x, x_ini, one_hot, num, tf.zeros_like(x)])
 
-    # ？？为什么这里的扰动需要做一次尺寸为1的高斯卷积运算？？
+    # 为什么这里的扰动需要做一次尺寸为1的高斯卷积运算
+    #   这个疑问黄博已解答，见《几个代码疑问.docx》之问题4
     noise = tf.nn.depthwise_conv2d(noise, stack_kernel, strides=[1, 1, 1, 1], padding='SAME')
 
     # 和cleverhans中的MIM算法实现一样，使用的是reduce_mean()，而非MIM算法原文中的计算L1范数 \
@@ -299,8 +304,8 @@ def compute_grads(x, x_ini, one_hot, i, grad):
 
     Args:
         x: 当前迭代的图像张量
-        x_ini: ??
-        one_hot: ??
+        x_ini: 关于x_ini的疑问黄博已解答，见《几个代码疑问.docx》之问题6
+        one_hot: 关于one_hot的疑问黄博已解答，见《几个代码疑问.docx》之问题5/6
         i: 应用偏移增强策略时，损失函数计算需要遍历k个增强样本，i为遍历循环控制变量
         grad: 采用偏移增强和虚拟集成策略的累加梯度
 
@@ -318,7 +323,7 @@ def compute_grads(x, x_ini, one_hot, i, grad):
     # 根据配置的本地白盒模型网络类型，返回相应模型对于x_nes的输出
     logits, end_points = get_logits(x_nes, model)
 
-    # ？？
+    # 关于此处n以及后续损失函数计算与文章内公式表达不一致的疑问，见见《几个代码疑问.docx》之问题7
     n = 1
 
     # cyclical augmentation (self-ensemble policy)
@@ -348,7 +353,8 @@ def compute_grads(x, x_ini, one_hot, i, grad):
 
 def main(_):
 
-    # 设置最大扰动约束：2*12/255 ？， 文章中不是提到是 12/255吗？
+    # 设置最大扰动约束：2*12/255， 文章中不是提到是 12/255吗
+    #   这个疑问黄博已解答，见《几个代码疑问.docx》之问题1/3
     eps = 2 * FLAGS.max_epsilon / 255.0
 
     batch_shape = [FLAGS.batch_size, FLAGS.image_height, FLAGS.image_width, 3]
@@ -437,10 +443,15 @@ if __name__ == '__main__':
 the logits outputs of the model:
     在机器学习中，logits是指模型的输出，但没有经过softmax或sigmoid等激活函数的变量。它们通常用于计算损失函数，而不是直接用于预测。在分类问题中，
     logits通常是一个向量，每个元素对应一个类别。
+    
+    在深度学习中，logits就是最终的全连接层的输出，而非其本意。通常神经网络中都是先有logits，而后通过sigmoid函数或者softmax函数得到概率 
+    的，所以大部分情况下都无需用到logit函数的表达式。 //参考这篇知乎回答：https://www.zhihu.com/question/60751553
 
 the set of end_points from the inception model:  
     在TensorFlow中，end_points是指在模型中的某些位置收集的张量。这些张量可以用于可视化、调试或其他目的。在Inception模型中，
     end_points包括每个Inception模块的输出，以及最终的logits输出。
+    
+    通俗理解，end_points包含模型每一层的输出，其中也包含了倒数第二层的输出即logits，其中最后一层输出层叫prediction
 
 """
 
