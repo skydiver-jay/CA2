@@ -35,14 +35,15 @@ tf.flags.DEFINE_integer('image_width', 299, 'Width of each input images.')
 
 tf.flags.DEFINE_integer('image_height', 299, 'Height of each input images.')
 
-# 后续没有用到的全局变量，目前推出时SIM算法中使用的一个参数
+# 后续没有用到的全局变量，根据文章中实验章节的参数说明，该参数为DIM算法的参数
+#   组合环境中 DIM 方法的输入随机变换概率 = 0.7
 tf.flags.DEFINE_float('prob', 0.7, 'probability of using diverse inputs.')
 
 tf.flags.DEFINE_integer('image_resize', 331, 'Height of each input images.')
 
 """
 sample_num: 属于CA2框架“偏移增强”特性的一个参数。 文章中的k，生成偏移增强样本的数量，也即是随机采样的数量。
-sample_variance: 为偏移距离，即文章中的w，文章中实验设置为0.05，此处设置为0.1，待确认哪个是默认推荐配置？？
+sample_variance: 为偏移距离，即文章中的ω，文章中实验设置为0.05，此处设置为0.1，待确认哪个是默认推荐配置？？
 """
 tf.flags.DEFINE_integer('sample_num', 4, 'the number of samples for SA.')
 
