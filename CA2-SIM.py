@@ -173,6 +173,8 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
 
     # TIM
     # 这里由于引入TIM算法策略，使用的卷积核尺寸为11，和基础版本的CA2不一致，可以对比基础版本CA2的代码
+    # TIM算法的思想是平移不变性攻击，理论上应该在compute_grads()中对样本进行大量的平移变化
+    #   但，TIM文章中通过数学证明，对梯度张量进行卷积操作 等价于 大量平移变化，并且可以提升计算效率，所以代码实现如下
     noise = tf.nn.depthwise_conv2d(noise, stack_kernel, strides=[1, 1, 1, 1], padding='SAME')
     noise = noise / tf.reduce_mean(tf.abs(noise), [1, 2, 3], keep_dims=True)
     noise = momentum * grad + noise
@@ -211,7 +213,7 @@ def compute_grads(x, x_ini, one_hot, i, grad):
     n = 1
 
     # SIM
-    # 此处为引入SIM算法思想的核心，即对偏移增强后的样本在每个像素上做数值缩放（每个像素除以一个整数2^i & i=1/2/3，即如下代码中的2/4/8），再计算梯度
+    # 此处为引入SIM算法思想的核心（缩放不变性攻击），即对偏移增强后的样本在每个像素上做数值缩放（每个像素除以一个整数2^i & i=1/2/3，即如下代码中的2/4/8），再计算梯度
     x_nes_2 = 1 / 2 * x_nes
     logits_2, end_points_2 = get_logits(x_nes_2, model)
 
