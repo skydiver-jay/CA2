@@ -1,0 +1,126 @@
+# 公开的一种MIM实现，来自https://github.com/cleverhans-lab/cleverhans，用作参考
+
+"""CA2基础班TF2版本 核心框架"""
+
+import numpy as np
+import tensorflow as tf
+
+from ref.utils import optimize_linear, compute_gradient
+from ref.utils import clip_eta
+
+from TF2.conf-basic import *
+
+
+def ca2_basic_tf2(
+    model_fn,
+    x,
+    eps=0.3,
+    eps_iter=0.06,
+    nb_iter=10,
+    norm=np.inf,
+    clip_min=None,
+    clip_max=None,
+    y=None,
+    targeted=False,
+    decay_factor=1.0,
+    sanity_checks=True,
+):
+    """
+    CA2基础版本的TF2版本实现。
+    :param model_fn: a callable that takes an input tensor and returns the model logits.
+    :param x: input tensor.
+    :param eps: (optional float) maximum distortion of adversarial example
+              compared to original input
+    :param eps_iter: (optional float) step size for each attack iteration
+    :param nb_iter: (optional int) Number of attack iterations.
+    :param norm: (optional) Order of the norm (mimics Numpy).
+              Possible values: np.inf, 1 or 2.
+    :param clip_min: (optional float) Minimum input component value
+    :param clip_max: (optional float) Maximum input component value
+    :param y: (optional) Tensor with true labels. If targeted is true, then provide the
+              target label. Otherwise, only provide this parameter if you'd like to use true
+              labels when crafting adversarial samples. Otherwise, model predictions are used
+              as labels to avoid the "label leaking" effect (explained in this paper:
+              https://arxiv.org/abs/1611.01236). Default is None.
+    :param targeted: (optional) bool. Is the attack targeted or untargeted?
+              Untargeted, the default, will try to make the label incorrect.
+              Targeted will instead try to move in the direction of being more like y.
+    :param decay_factor: (optional) Decay factor for the momentum term.
+    :param sanity_checks: bool, if True, include asserts (Turn them off to use less runtime /
+              memory or for unit tests that intentionally pass strange input)
+    :return: a tensor for the adversarial example
+    """
+
+    if norm == 1:
+        raise NotImplementedError(
+            "This attack hasn't been tested for norm=1."
+            "It's not clear that FGM makes a good inner "
+            "loop step for iterative optimization since "
+            "it updates just one coordinate at a time."
+        )
+
+    # Check if order of the norm is acceptable given current implementation
+    if norm not in [np.inf, 1, 2]:
+        raise ValueError("Norm order must be either np.inf, 1, or 2.")
+
+    asserts = []
+
+    # If a data range was specified, check that the input was in that range
+    if clip_min is not None:
+        asserts.append(tf.math.greater_equal(x, clip_min))
+
+    if clip_max is not None:
+        asserts.append(tf.math.less_equal(x, clip_max))
+
+    # 此处处理target/non-target攻击区别，如果是target攻击，y由外部传入；如果是non-target攻击，y由本地模型预测得到
+    # y是后续计算梯度的必须参数
+    if y is None:
+        # Using model predictions as ground truth to avoid label leaking
+        y = tf.argmax(model_fn(x), 1)
+
+    # Initialize loop variables
+    momentum = tf.zeros_like(x)
+    adv_x = x
+
+    i = 0
+    while i < nb_iter:
+        # Define gradient of loss wrt input
+        grad = compute_gradient(model_fn, loss_fn, adv_x, y, targeted)
+
+        # Normalize current gradient and add it to the accumulated gradient
+        # tf.math.reduce_mean: https://www.w3cschool.cn/tensorflow_python/tensorflow_python-hckq2htb.html
+        red_ind = list(range(1, len(grad.shape)))
+        avoid_zero_div = tf.cast(1e-12, grad.dtype)
+        grad = grad / tf.math.maximum(
+            avoid_zero_div,
+            tf.math.reduce_mean(tf.math.abs(grad), red_ind, keepdims=True),
+        )
+        momentum = decay_factor * momentum + grad
+
+        # 此处的实现与原文伪代码不一致
+        #   根据原文伪代码 optimal_perturbation 等于 步长 * sign(momentum)，CA2中的实现与原文伪代码一致
+        #   但此处optimal_perturbation 等于 optimize_linear()，其中针对不同范数，对momentum的应用
+        #       当norm==tf.inf时，optimize_linear()的行为与原文一致
+        optimal_perturbation = optimize_linear(momentum, eps_iter, norm)
+        # Update and clip adversarial example in current iteration
+        adv_x = adv_x + optimal_perturbation
+        # 这一步用于确保每一个像素的扰动范围都在定义的eps范围内，功能类似tf.clip_by_value
+        adv_x = x + clip_eta(adv_x - x, norm, eps)
+
+        # 这一步控制，每一轮迭代更新后，样本x的变动不超出定义的最大有效范围，可参考CA2.py-main()中的x_max和x_min
+        if clip_min is not None and clip_max is not None:
+            adv_x = tf.clip_by_value(adv_x, clip_min, clip_max)
+        i += 1
+
+    if sanity_checks:
+        assert np.all(asserts)
+
+    return adv_x
+
+
+def loss_fn(labels, logits):
+    """
+    Added softmax cross entropy loss for MIM as in the original MI-FGSM paper.
+    """
+
+    return tf.nn.sparse_softmax_cross_entropy_with_logits(labels, logits, name=None)
