@@ -8,22 +8,22 @@ import tensorflow as tf
 from ref.utils import optimize_linear, compute_gradient
 from ref.utils import clip_eta
 
-from TF2.conf-basic import *
+from TF2.conf_basic import *
 
 
 def ca2_basic_tf2(
-    model_fn,
-    x,
-    eps=0.3,
-    eps_iter=0.06,
-    nb_iter=10,
-    norm=np.inf,
-    clip_min=None,
-    clip_max=None,
-    y=None,
-    targeted=False,
-    decay_factor=1.0,
-    sanity_checks=True,
+        model_fn,
+        x,
+        eps=max_epsilon,
+        eps_iter=max_epsilon/255.0,
+        nb_iter=iteration_num,
+        norm=np.inf,
+        clip_min=None,
+        clip_max=None,
+        y=None,
+        targeted=False,
+        decay_factor=momentum_decay_factor,
+        sanity_checks=True,
 ):
     """
     CA2基础版本的TF2版本实现。
@@ -51,71 +51,7 @@ def ca2_basic_tf2(
     :return: a tensor for the adversarial example
     """
 
-    if norm == 1:
-        raise NotImplementedError(
-            "This attack hasn't been tested for norm=1."
-            "It's not clear that FGM makes a good inner "
-            "loop step for iterative optimization since "
-            "it updates just one coordinate at a time."
-        )
-
-    # Check if order of the norm is acceptable given current implementation
-    if norm not in [np.inf, 1, 2]:
-        raise ValueError("Norm order must be either np.inf, 1, or 2.")
-
-    asserts = []
-
-    # If a data range was specified, check that the input was in that range
-    if clip_min is not None:
-        asserts.append(tf.math.greater_equal(x, clip_min))
-
-    if clip_max is not None:
-        asserts.append(tf.math.less_equal(x, clip_max))
-
-    # 此处处理target/non-target攻击区别，如果是target攻击，y由外部传入；如果是non-target攻击，y由本地模型预测得到
-    # y是后续计算梯度的必须参数
-    if y is None:
-        # Using model predictions as ground truth to avoid label leaking
-        y = tf.argmax(model_fn(x), 1)
-
-    # Initialize loop variables
-    momentum = tf.zeros_like(x)
-    adv_x = x
-
-    i = 0
-    while i < nb_iter:
-        # Define gradient of loss wrt input
-        grad = compute_gradient(model_fn, loss_fn, adv_x, y, targeted)
-
-        # Normalize current gradient and add it to the accumulated gradient
-        # tf.math.reduce_mean: https://www.w3cschool.cn/tensorflow_python/tensorflow_python-hckq2htb.html
-        red_ind = list(range(1, len(grad.shape)))
-        avoid_zero_div = tf.cast(1e-12, grad.dtype)
-        grad = grad / tf.math.maximum(
-            avoid_zero_div,
-            tf.math.reduce_mean(tf.math.abs(grad), red_ind, keepdims=True),
-        )
-        momentum = decay_factor * momentum + grad
-
-        # 此处的实现与原文伪代码不一致
-        #   根据原文伪代码 optimal_perturbation 等于 步长 * sign(momentum)，CA2中的实现与原文伪代码一致
-        #   但此处optimal_perturbation 等于 optimize_linear()，其中针对不同范数，对momentum的应用
-        #       当norm==tf.inf时，optimize_linear()的行为与原文一致
-        optimal_perturbation = optimize_linear(momentum, eps_iter, norm)
-        # Update and clip adversarial example in current iteration
-        adv_x = adv_x + optimal_perturbation
-        # 这一步用于确保每一个像素的扰动范围都在定义的eps范围内，功能类似tf.clip_by_value
-        adv_x = x + clip_eta(adv_x - x, norm, eps)
-
-        # 这一步控制，每一轮迭代更新后，样本x的变动不超出定义的最大有效范围，可参考CA2.py-main()中的x_max和x_min
-        if clip_min is not None and clip_max is not None:
-            adv_x = tf.clip_by_value(adv_x, clip_min, clip_max)
-        i += 1
-
-    if sanity_checks:
-        assert np.all(asserts)
-
-    return adv_x
+    pass
 
 
 def loss_fn(labels, logits):
