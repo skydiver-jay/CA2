@@ -258,6 +258,7 @@ def graph(x, x_ini, y, i, iternum, x_max, x_min, grad):
     #   此处noise最终为根据动量优化策略计算当前迭代的循环优化梯度g，momentum就是速度衰减权重μ
     # 循环优化的一个关键点：知识蒸馏，存在一个学习权重β参数，在每个循环优化阶段的初始迭代中，前序迭代的g需要乘以β后再进行后续的迭代累加 \
     #   但是由于文中实验表明，优选的β值为1.0，所以这里在代码实现中没有体现出来这个关键点。后续迁移至tf2，建议体现出该配置，也便于理解算法思想。
+    # tf.math.reduce_mean: https://www.w3cschool.cn/tensorflow_python/tensorflow_python-hckq2htb.html
     noise = noise / tf.reduce_mean(tf.abs(noise), [1, 2, 3], keep_dims=True)
     noise = momentum * grad + noise
 
