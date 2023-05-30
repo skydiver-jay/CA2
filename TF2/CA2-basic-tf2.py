@@ -1,12 +1,7 @@
-# 公开的一种MIM实现，来自https://github.com/cleverhans-lab/cleverhans，用作参考
-
 """CA2基础班TF2版本 核心框架"""
 
 import numpy as np
 import tensorflow as tf
-
-from ref.utils import optimize_linear, compute_gradient
-from ref.utils import clip_eta
 
 from TF2.conf_basic import *
 
@@ -14,9 +9,9 @@ from TF2.conf_basic import *
 def ca2_basic_tf2(
         model_fn,
         x,
-        eps=max_epsilon,
-        eps_iter=max_epsilon/255.0,
-        nb_iter=iteration_num,
+        eps=12.0,
+        eps_iter=2.0*12.0/255.0,
+        nb_iter=16,
         norm=np.inf,
         clip_min=None,
         clip_max=None,
@@ -33,8 +28,7 @@ def ca2_basic_tf2(
               compared to original input
     :param eps_iter: (optional float) step size for each attack iteration
     :param nb_iter: (optional int) Number of attack iterations.
-    :param norm: (optional) Order of the norm (mimics Numpy).
-              Possible values: np.inf, 1 or 2.
+    :param norm: (预留) 当前只支持默认值: np.inf.
     :param clip_min: (optional float) Minimum input component value
     :param clip_max: (optional float) Maximum input component value
     :param y: (optional) Tensor with true labels. If targeted is true, then provide the
@@ -51,6 +45,44 @@ def ca2_basic_tf2(
     :return: a tensor for the adversarial example
     """
 
+    if norm != np.inf:
+        raise ValueError("norm当前仅支持设置为: np.inf.")
+
+    asserts = []
+
+    # If a data range was specified, check that the input was in that range
+    if clip_min is not None:
+        asserts.append(tf.math.greater_equal(x, clip_min))
+
+    if clip_max is not None:
+        asserts.append(tf.math.less_equal(x, clip_max))
+
+    # 此处处理target/non-target攻击区别，如果是target攻击，y由外部传入；如果是non-target攻击，y由本地模型预测得到
+    # y是后续计算梯度的必须参数
+    if y is None:
+        # Using model predictions as ground truth to avoid label leaking
+        y = tf.argmax(model_fn(x), 1)
+
+    # Initialize loop variables
+    cyclical_momentum = tf.zeros_like(x)
+
+    adv_x = x
+
+    # 循环优化过程，phase_num为一个全局配置，总循环优化阶段数
+    for k in range(phase_num):
+        # iter_num设置为当前循环优化阶段的迭代数，phase_step为一个全局配置，各循环优化阶段的迭代数
+        iter_num = phase_step[k]
+        # 进入第k阶段循环优化，起点x、阶段内迭代数iter_num、循环优化动量初始值cyclical_momentum
+        adv_x, cyclical_momentum = graph(x, iter_num, cyclical_momentum)
+
+    pass
+
+
+def compute_gradient():
+    pass
+
+
+def graph(x, iter_num, cyclical_momentum):
     pass
 
 
