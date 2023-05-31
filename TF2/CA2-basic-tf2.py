@@ -1,6 +1,6 @@
 """CA2基础班TF2版本 核心框架"""
 
-import numpy as np
+# import numpy as np
 import tensorflow as tf
 
 from TF2.conf_basic import *
