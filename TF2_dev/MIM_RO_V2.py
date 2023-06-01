@@ -144,9 +144,8 @@ def transformation_d2a(x):
     # 随机采样得到偏移向量
     vector = tf.random.normal(shape=x.shape)
 
-    # cyclical augmentation (deviation-augmentation)
-    # sample_variance为偏移距离（文章中的w），可以理解为图像每个像素的偏移量
-    # 通过sign函数符号化偏移向量，可以控制每像素偏移值为 -w、0、w
+    # sample_variance为偏移距离（文章中的ω），可以理解为图像每个像素的偏移量
+    # 通过sign函数符号化偏移向量，可以控制每像素偏移值为 -ω、0、ω
     x_nes = x + sample_variance * tf.sign(vector)
 
     x_nes = x_nes * 255.0

@@ -20,8 +20,7 @@ def sample_and_show(model, path):
 
 
 if __name__ == "__main__":
-    print("tensorflow's version is: ")
-    print(tf.__version__)
+    print("tensorflow's version is: %s" % tf.__version__)
     print("\n")
 
     print("-- 初始化模型: ResNet50 --")
