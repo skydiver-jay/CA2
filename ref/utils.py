@@ -187,6 +187,8 @@ def compute_gradient(model_fn, loss_fn, x, y, targeted):
     with tf.GradientTape() as g:
         g.watch(x)
         # Compute loss
+        # 若要集成VME等虚拟模型方向类的策略，此处logits的输入为多个虚拟模型的综合logits，而不再是针对单个输入样本的logits
+        #   改造原本compute_gradient() -> compute_gradient_ca2()
         loss = loss_fn(labels=y, logits=model_fn(x))
         if (
             targeted

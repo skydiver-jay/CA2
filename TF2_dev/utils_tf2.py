@@ -18,3 +18,8 @@ def gkern(kernlen=21, nsig=3):
     stack_kernel = np.stack([kernel, kernel, kernel]).swapaxes(2, 0)
     stack_kernel = np.expand_dims(stack_kernel, 3)
     return stack_kernel
+
+
+if __name__ == "__main__":
+    stack_kernel_9 = gkern(9, 3)
+    print(stack_kernel_9.shape)

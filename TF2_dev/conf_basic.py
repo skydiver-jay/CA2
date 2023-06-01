@@ -42,6 +42,7 @@ list_stack_kernel_size = [1, 9, 11]
 stack_kernel = gkern(list_stack_kernel_size[0], 1)
 stack_kernel_9 = gkern(list_stack_kernel_size[1], 3)
 stack_kernel_11 = gkern(list_stack_kernel_size[2], 3)
+stack_kernel_list = [stack_kernel, stack_kernel_9, stack_kernel_11]
 
 # 参数合法性检查
 if phase_num != len(phase_step):
