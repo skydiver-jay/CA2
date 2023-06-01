@@ -183,6 +183,7 @@ def compute_gradient(model_fn, loss_fn, x, y, targeted):
     :return: A tensor containing the gradient of the loss with respect to the input tensor.
     """
 
+    # tf.GradientTape(), 参考https://blog.csdn.net/guanxs/article/details/102471843
     with tf.GradientTape() as g:
         g.watch(x)
         # Compute loss

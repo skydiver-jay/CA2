@@ -1,14 +1,13 @@
-# 先搞一个RO版本的MIM，能够正常运行，再加入SA
-#   引入SA，总迭代次数需要分为多个循环优化阶段，阶段配置引用conf_basic.py中的配置
-#   另外，还需要新增学习权重参数-momentum_learn_factor，同样引用conf_basic.py中的配置
+# 基于MIM-RO版本，尝试加入数据增强算子
+# V2版本先加入较为简单的D2A策略，D2A实现参考CA2.py
+#   D2A策略中需要使用的参数 sample_num & sample_variance均直接使用全局配置
 
-"""The MomentumIterativeMethod attack."""
+"""采用循环优化RO策略，并且集成D2A策略的MIM"""
 
 import numpy as np
 import tensorflow as tf
 
-# from cleverhans.tf2.utils import optimize_linear, compute_gradient
-# from cleverhans.tf2.utils import clip_eta
+# ref.utils来自于cleverhans项目源码
 from ref.utils import optimize_linear, compute_gradient
 from ref.utils import clip_eta
 
@@ -18,29 +17,21 @@ from conf_basic import *
 def momentum_iterative_method(
         model_fn,
         x,
-        # eps=0.3,  # 改为使用全局配置
-        # eps_iter=0.06,  # 改为使用全局配置
-        # nb_iter=10,  # 改为使用全局配置
         norm=np.inf,
         clip_min=None,
         clip_max=None,
         y=None,
         targeted=False,
-        # decay_factor=1.0,  # 改为使用全局配置
         sanity_checks=True,
 ):
     """
-    Tensorflow 2.0 implementation of Momentum Iterative Method (Dong et al. 2017) -- 增加循环优化RO策略的版本.
+    Tensorflow 2.0 implementation of Momentum Iterative Method (Dong et al. 2017).
     This method won the first places in NIPS 2017 Non-targeted Adversarial Attacks
     and Targeted Adversarial Attacks. The original paper used hard labels
     for this attack; no label smoothing.
     Paper link: https://arxiv.org/pdf/1710.06081.pdf
     :param model_fn: a callable that takes an input tensor and returns the model logits.
     :param x: input tensor.
-    :param eps: (optional float) maximum distortion of adversarial example
-              compared to original input
-    :param eps_iter: (optional float) step size for each attack iteration
-    :param nb_iter: (optional int) Number of attack iterations.
     :param norm: (optional) Order of the norm (mimics Numpy).
               Possible values: np.inf, 1 or 2.
     :param clip_min: (optional float) Minimum input component value
@@ -53,7 +44,6 @@ def momentum_iterative_method(
     :param targeted: (optional) bool. Is the attack targeted or untargeted?
               Untargeted, the default, will try to make the label incorrect.
               Targeted will instead try to move in the direction of being more like y.
-    :param decay_factor: (optional) Decay factor for the momentum term.
     :param sanity_checks: bool, if True, include asserts (Turn them off to use less runtime /
               memory or for unit tests that intentionally pass strange input)
     :return: a tensor for the adversarial example
@@ -76,6 +66,7 @@ def momentum_iterative_method(
     # y是后续计算梯度的必须参数
     if y is None:
         # Using model predictions as ground truth to avoid label leaking
+        # TensorFlow 返回张量的最大值索引API，https://www.w3cschool.cn/tensorflow_python/tensorflow_python-lbm22c8b.html
         y = tf.argmax(model_fn(x), 1)
 
     # Initialize loop variables
@@ -96,8 +87,16 @@ def momentum_iterative_method(
         for j in range(phase_step[i]):
             print("---- 进入第%d个循环优化阶段的第%d次迭代 ----" % (i+1, j+1))
             # 计算梯度
-            # 根据‘认识CA2.md’中的分析，SA策略中将要提取的算子，基本都是在计算损失函数前，对输入样本的变换（除TIM策略外）
-            grad = compute_gradient(model_fn, loss_fn, adv_x, y, targeted)
+            #   根据‘认识CA2.md’中的分析，SA策略中将要提取的算子，基本都是在计算损失函数前，对输入样本的变换（除TIM策略外）
+            #   V2版本加入D2A策略，D2A策略会随机采样sample_num个偏移方向，每个方向经过偏移sample_variance后获得，sample_num个偏移增强样本
+            #   使用sample_num个偏移增强样本计算梯度值，最终综合梯度等于累积梯度/sample_num
+            print("开始计算D2A策略综合梯度")
+            grad = tf.zeros_like(x)
+            for k in range(sample_num):
+                print("---- 进入第%d个循环优化阶段的第%d次迭代，第%d个偏移样本梯度计算 ----" % (i + 1, j + 1, k+1))
+                x_nes = transformation_d2a(adv_x)
+                grad = grad + compute_gradient(model_fn, loss_fn, x_nes, y, targeted)
+            grad = grad / sample_num
 
             # 计算累积梯度：这一部分可以抽象出来作为一个独立算子，替换该算子，即可集成不同的优化算法，如从MI -> NI
             # tf.math.reduce_mean: https://www.w3cschool.cn/tensorflow_python/tensorflow_python-hckq2htb.html
@@ -129,6 +128,29 @@ def momentum_iterative_method(
     if sanity_checks:
         assert np.all(asserts)
     return adv_x
+
+
+def transformation_d2a(x):
+    """
+    采用D2A策略对输入样本进行’增强‘变换
+    :param x: 输入样本
+    :return: 根据D2A变换后的增强样本
+    """
+    # CA2.py中由于使用inception模型，样本均归一化到(-1,1). sample_variance的配置也作用在归一化后的样本上，最优配置为0.1。
+    #   实则文中在(0,1)语境下表述，最优配置为0.05
+    # 本代码中本地使用ResNet模型，样本为(0,255)，因此在应用D2A策略相关配置时，将样本先归一化到(0,1)，计算完在还原至(0,255)
+    x = x / 255.0
+
+    # 随机采样得到偏移向量
+    vector = tf.random.normal(shape=x.shape)
+
+    # cyclical augmentation (deviation-augmentation)
+    # sample_variance为偏移距离（文章中的w），可以理解为图像每个像素的偏移量
+    # 通过sign函数符号化偏移向量，可以控制每像素偏移值为 -w、0、w
+    x_nes = x + sample_variance * tf.sign(vector)
+
+    x_nes = x_nes * 255.0
+    return x_nes
 
 
 def loss_fn(labels, logits):
