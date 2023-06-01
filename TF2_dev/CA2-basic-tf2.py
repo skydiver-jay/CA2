@@ -3,7 +3,7 @@
 # import numpy as np
 import tensorflow as tf
 
-from TF2.conf_basic import *
+from TF2_dev.conf_basic import *
 
 
 def ca2_basic_tf2(

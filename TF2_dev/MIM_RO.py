@@ -98,7 +98,7 @@ def momentum_iterative_method(
             # 计算梯度
             grad = compute_gradient(model_fn, loss_fn, adv_x, y, targeted)
 
-            # 计算累积梯度
+            # 计算累积梯度：这一部分可以抽象出来作为一个独立算子，替换该算子，即可集成不同的优化算法，如从MI -> NI
             # tf.math.reduce_mean: https://www.w3cschool.cn/tensorflow_python/tensorflow_python-hckq2htb.html
             red_ind = list(range(1, len(grad.shape)))
             avoid_zero_div = tf.cast(1e-12, grad.dtype)
@@ -107,11 +107,12 @@ def momentum_iterative_method(
                 tf.math.reduce_mean(tf.math.abs(grad), red_ind, keepdims=True),
             )
             momentum = momentum_decay_factor * momentum + grad
+            # 计算累积梯度 end
 
             # 此处的实现与原文伪代码不一致
-            #   根据原文伪代码 optimal_perturbation 等于 步长 * sign(momentum)，CA2中的实现与原文伪代码一致
-            #   但此处optimize_linear()，其中针对不同范数，对momentum的应用不一样
-            #       当norm==tf.inf时，optimize_linear()的行为与原文一致
+            #   根据MIM原文伪代码 optimal_perturbation 应等于 步长 * sign(momentum)，CA2中的实现与原文伪代码一致
+            #   但此处的optimize_linear()，其中针对不同范数，对momentum的应用不一样
+            #       当norm==tf.inf时，optimize_linear()的行为与原文一致，所以使用optimize_linear()是只使用norm==tf.inf场景
             #       当前迭代的步长为eps_iter：最大扰动范围 / 第i个循环优化阶段的迭代总数
             eps_iter = max_epsilon / phase_step[i]
             optimal_perturbation = optimize_linear(momentum, eps_iter, norm)

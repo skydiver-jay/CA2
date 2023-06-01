@@ -1,7 +1,7 @@
 """CA2基础班TF2版本 配置文件"""
 
 import numpy as np
-from TF2.utils_tf2 import *
+from TF2_dev.utils_tf2 import *
 import random
 
 """
