@@ -44,7 +44,7 @@ def ca2_tf2_demo():
     # exit(1)
 
     if ref.utils_ditto.is_adv(original_label, adv_x_label):
-        filename = "output/adv_MIM_RO_V3_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        filename = "output/adv_ca2_basic_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
         print(
             "\n---- 攻击得出的数字对抗样本的top标签 %d ，保存为文件: %s ----" % (int(np.argmax(adv_x_label)), filename))
         ref.utils_ditto.save_image(adv_x[0], filename)

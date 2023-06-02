@@ -1,9 +1,9 @@
-"""CA2基础版TF2版本 配置文件"""
+"""CA2 PLUS版（如CA2-SIM+）TF2版本 配置文件"""
 
 from utils_tf2 import *
 
 """
-此配置文件仅包括CA2中RO和SA相关配置。
+此配置文件包括CA2中RO和SA相关配置。以及PLUS中集成的个策略的配置如：DIM、SIM、TIM
 本地模型和图像相关配置使用单独配置文件。
 """
 
@@ -19,7 +19,6 @@ max_epsilon = 3.0
 
 # 动量衰减系数/动量衰减权重
 momentum_decay_factor = 1.0
-
 
 ##########################           偏移增强D2A策略配置           ##########################
 # sample_num: 属于CA2框架“偏移增强”策略的一个参数。 文章中的k，生成偏移增强样本的数量，也即是随机采样的数量
@@ -47,6 +46,11 @@ stack_kernel_1 = gkern(list_stack_kernel_size[0], 3)  # 实际上不起作用
 stack_kernel_2 = gkern(list_stack_kernel_size[1], 3)
 stack_kernel_3 = gkern(list_stack_kernel_size[2], 3)
 stack_kernel_list = [stack_kernel_1, stack_kernel_2, stack_kernel_3]
+
+##########################           DIM策略配置           ##########################
+# PLUS版本中 DIM 方法的输入随机变换概率，CA2文章实验推荐使用0.7
+diverse_probability = 0.7
+
 
 # 参数合法性检查
 if phase_num != len(phase_step):
