@@ -48,8 +48,15 @@ stack_kernel_3 = gkern(list_stack_kernel_size[2], 3)
 stack_kernel_list = [stack_kernel_1, stack_kernel_2, stack_kernel_3]
 
 ##########################           DIM策略配置           ##########################
-# PLUS版本中 DIM 方法的输入随机变换概率，CA2文章实验推荐使用0.7
+# PLUS版本中 DIM 方法的输入随机变换概率（0 <= prob <= 1.0），CA2文章实验推荐使用0.7
 diverse_probability = 0.7
+
+##########################           TIM策略配置           ##########################
+# 引入TIM算法策略，使用的卷积核尺寸为11*11
+# TIM算法的思想是平移不变性攻击，理论上应该在compute_grads()中对样本进行大量的平移变化
+#   TIM文章中通过数学证明，对梯度张量进行卷积操作 等价于 大量平移变化，并且可以提升计算效率
+stack_kernel_size_tim = 11
+stack_kernel_tim = gkern(stack_kernel_size_tim, 3)
 
 
 # 参数合法性检查
@@ -78,6 +85,10 @@ print_global_conf(sample_num, "D2A 之 偏移增强样本个数")
 print_global_conf(sample_variance, "D2A 之 偏移距离")
 
 print_global_conf(list_stack_kernel_size, "VME 之 卷积核尺寸配置")
+
+print_global_conf(diverse_probability, "DIM 之 随机变换概率")
+
+print_global_conf(stack_kernel_size_tim, "TIM 之 平移等价高斯卷积核尺寸")
 
 print_global_conf(tf.__version__, "TensorFlow版本")
 
