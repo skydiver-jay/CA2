@@ -1,12 +1,15 @@
 # 基于CA2_TF2，再合入SIM、TIM策略，完成CA2-SIM+的TF2实现
 
 # SIM策略使用并联的虚拟模型类增强策略，新增实现在compute_gradient_ca2()中 -> compute_gradient_ca2_plus()
+# 已完成
 
 # TIM策略属于特殊的串联策略
 #   TIM算法的思想是平移不变性攻击，理论上应该在compute_grads()中对样本进行大量的平移变化
 #   但，TIM文章中通过数学证明，对梯度张量进行卷积操作 等价于 大量平移变化，并且可以提升计算效率，所以代码实现如下
+# 已完成
 
 # DIM策略为串联的数据增强类的策略，新增transformation_dim()，实现该增强策略
+# 观察TF1版本CA2-SIM.py中DIM相关实现，DIM策略实现在最接近logits计算的位置，即所有样本在计算logits前都要进行DIM策略变换
 
 """
 Tensorflow 2.0版本的CA2基础版实现，与原TF1版的的CA2.py对应
@@ -16,9 +19,11 @@ Tensorflow 2.0版本的CA2基础版实现，与原TF1版的的CA2.py对应
 @Skydiver
 """
 
-# 导入全局配置，最大噪声范围、RO/SA策略配置等
-from conf_basic import *
+# 导入全局配置，最大噪声范围、RO/SA策略、TIM、SIM、DIM配置等
+from conf_plus import *
 from utils_tf2 import *
+
+import math
 
 
 def ca2_tf2(
@@ -66,6 +71,12 @@ def ca2_tf2(
     if y is None:
         y = tf.argmax(model_fn(x), 1)
 
+    # DIM策略为串联的数据增强类的策略，新增transformation_dim()，实现该增强策略
+    # 观察TF1版本CA2-SIM.py中DIM相关实现，DIM策略实现在最接近logits计算的位置，即所有样本在计算logits前都要进行DIM策略变换
+    # 所以新增如下结合DIM策略的新model函数，在调用compute_gradient_ca2()时作为参数传入
+    def model_fn_dim(x_dim):
+        return model_fn(transformation_dim(x_dim))
+
     # 初始化循环优化动量/梯度
     momentum = tf.zeros_like(x)
     adv_x = tf.zeros_like(x)
@@ -92,8 +103,11 @@ def ca2_tf2(
                 # 对样本实施D2A策略进行增强
                 x_nes = transformation_d2a(adv_x)
                 # VME策略，集成点在logits计算后，见compute_gradient_ca2()内部实现
-                grad = grad + compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted)
+                grad = grad + compute_gradient_ca2(model_fn_dim, loss_fn, x_nes, y, targeted)
             grad = grad / sample_num
+
+            # 计算引入TIM策略后梯度
+            grad = tf.nn.depthwise_conv2d(grad, stack_kernel_tim, strides=[1, 1, 1, 1], padding='SAME')
 
             # 计算累积梯度
             red_ind = list(range(1, len(grad.shape)))
@@ -151,6 +165,15 @@ def transformation_d2a(x):
     return x_nes
 
 
+def transformation_dim(x):
+    """
+    采用DIM策略对输入样本进行’增强‘变换
+    :param x: 输入样本
+    :return: 根据DIM变换后的增强样本
+    """
+    return x
+
+
 @tf.function
 def compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted):
     """
@@ -167,12 +190,13 @@ def compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted):
     with tf.GradientTape() as g:
         g.watch(x_nes)
 
-        # 初始化卷积核数量
+        # 初始化卷积核数量，也即VME策略虚拟模型数量
         stack_kernel_num = len(list_stack_kernel_size)
         base_logits = model_fn(x_nes)
         # 初始化logits为0
         logits = tf.zeros_like(base_logits)
 
+        # 计算VME策略综合logits
         for i in range(stack_kernel_num):
 
             # 如果卷积核尺寸为1*1，则相当于不变，则无需真的进行卷积计算，直接累加原logits
@@ -184,8 +208,12 @@ def compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted):
                 x_conv = tf.nn.depthwise_conv2d(x_nes, stack_kernel_list[i], strides=[1, 1, 1, 1], padding='SAME')
                 logits = logits + model_fn(x_conv)
 
-        # 多个虚拟模型输出的均值，用于后续计算当前增强样本的综合损失函数
-        logits = logits / stack_kernel_num
+        # 计算SIM策略综合logits，共形成3个虚拟模型
+        for j in range(3):
+            logits = logits + model_fn(x_nes * (1 / math.pow(2, j+1)))
+
+        # 多个虚拟模型（VME & SIM策略）输出的均值，用于后续计算当前增强样本的综合损失函数
+        logits = logits / (stack_kernel_num + 3)
 
         # 计算综合损失函数
         loss = loss_fn(labels=y, logits=logits)
