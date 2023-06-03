@@ -4,7 +4,6 @@ from utils_tf2 import *
 
 """
 此配置文件仅包括CA2中RO和SA相关配置。
-本地模型和图像相关配置使用单独配置文件。
 """
 
 # 仅当不需要真随机场景时，将need_true_random配置为False

@@ -4,7 +4,6 @@ from utils_tf2 import *
 
 """
 此配置文件包括CA2中RO和SA相关配置。以及PLUS中集成的个策略的配置如：DIM、SIM、TIM
-本地模型和图像相关配置使用单独配置文件。
 """
 
 # 仅当不需要真随机场景时，将need_true_random配置为False
@@ -12,6 +11,12 @@ need_true_random = True
 seed = 0
 if not need_true_random:
     tf.random.set_seed(seed)
+
+# image_resize为本地模型输入需要的图像大小(shape)，如ResNet50为(224,224)
+# image_size为原始图像大小，如本项目demo中的图像为(512,512)
+# 这两个参数将在DIM策略中起作用，实际使用时，需要根据输入图像及本地模型需求进行配置
+image_resize = 224
+image_size = 512
 
 # 原图最大扰动范围，CA2文中实验设置为12.0，但在ImageNet数据集和ResNet模型上实验结果噪声过于明显。
 # 本地实验显示，设置为3.0，获得的对抗样本噪声几乎不影响视觉效果。

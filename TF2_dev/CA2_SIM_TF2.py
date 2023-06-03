@@ -1,18 +1,5 @@
-# 基于CA2_TF2，再合入SIM、TIM策略，完成CA2-SIM+的TF2实现
-
-# SIM策略使用并联的虚拟模型类增强策略，新增实现在compute_gradient_ca2()中 -> compute_gradient_ca2_plus()
-# 已完成
-
-# TIM策略属于特殊的串联策略
-#   TIM算法的思想是平移不变性攻击，理论上应该在compute_grads()中对样本进行大量的平移变化
-#   但，TIM文章中通过数学证明，对梯度张量进行卷积操作 等价于 大量平移变化，并且可以提升计算效率，所以代码实现如下
-# 已完成
-
-# DIM策略为串联的数据增强类的策略，新增transformation_dim()，实现该增强策略
-# 观察TF1版本CA2-SIM.py中DIM相关实现，DIM策略实现在最接近logits计算的位置，即所有样本在计算logits前都要进行DIM策略变换
-
 """
-Tensorflow 2.0版本的CA2基础版实现，与原TF1版的的CA2.py对应
+Tensorflow 2.0版本的CA2-SIM+版实现，与原TF1版的的CA2-SIM.py对应
 
 经过测试的TensorFlow版本：2.7.0 、 2.8.0
 
@@ -37,8 +24,8 @@ def ca2_tf2(
         sanity_checks=True,
 ):
     """
-    Tensorflow 2.0版本的CA2基础版实现，与原TF1版的的CA2.py对应
-    该实现中基于动量的优化部分参考cleverhans中的momentum_iterative_method. 调整的部分，均基于尊重MIM和CA2原文实现
+    Tensorflow 2.0版本的CA2-SIM+版实现，与原TF1版的的CA2-SIM.py对应
+    该实现中基于动量的优化部分参考cleverhans中的momentum_iterative_method. 所有调整的部分，均基于尊重MIM和CA2原文实现
         https://github.com/cleverhans-lab/cleverhans/blob/master/cleverhans/tf2/attacks/momentum_iterative_method.py
     :param model_fn: 本地模型函数，调用可返回输入样本的logits；当前仅支持攻击单个模型，暂不支持攻击集成的多个模型
     :param x: 输入样本
@@ -72,7 +59,7 @@ def ca2_tf2(
         y = tf.argmax(model_fn(x), 1)
 
     # DIM策略为串联的数据增强类的策略，新增transformation_dim()，实现该增强策略
-    # 观察TF1版本CA2-SIM.py中DIM相关实现，DIM策略实现在最接近logits计算的位置，即所有样本在计算logits前都要进行DIM策略变换
+    # 观察TF1版本CA2-SIM.py中DIM相关实现，DIM策略实施在最接近logits计算的位置，即所有样本在计算logits前都要进行DIM策略变换
     # 所以新增如下结合DIM策略的新model函数，在调用compute_gradient_ca2()时作为参数传入
     def model_fn_dim(x_dim):
         return model_fn(transformation_dim(x_dim))
@@ -83,7 +70,7 @@ def ca2_tf2(
 
     for i in range(phase_num):
         # 进入第i+1个循环优化阶段
-        print("---- 进入第%d个循环优化阶段, 当前阶段迭代总数为%d ----" % (i + 1, phase_step[i]))
+        print("---- 进入第[%d]个循环优化阶段, 当前阶段迭代总数为[%d] ----" % (i + 1, phase_step[i]))
 
         # 每个循环优化阶段开始时，样本均初始化为原始样本（即重新出发）
         adv_x = x
@@ -92,17 +79,17 @@ def ca2_tf2(
 
         for j in range(phase_step[i]):
             # 进入第i+1个循环优化阶段的第j+1次迭代
-            print("--- 进入第%d个循环优化阶段的第%d次迭代 ---" % (i + 1, j + 1))
+            print("--- 进入第[%d]个循环优化阶段的第[%d]次迭代 ---" % (i + 1, j + 1))
 
-            # 计算SA(D2A & VME)策略综合梯度
-            print("\t开始计算SA策略综合梯度(基础版本SA仅包含D2A、VME)")
+            # 计算SA(D2A、VME、DIM、SIM、TIM)策略综合梯度
+            print("\t开始计算SA策略综合梯度(SIM+版本SA包含D2A、VME、DIM、SIM、TIM)")
             grad = tf.zeros_like(x)
             for k in range(sample_num):
                 # 进入第i+1个循环优化阶段的第j+1次迭代，第k+1个偏移样本梯度计算
-
                 # 对样本实施D2A策略进行增强
                 x_nes = transformation_d2a(adv_x)
-                # VME策略，集成点在logits计算后，见compute_gradient_ca2()内部实现
+                # 实施VME & SIM策略，集成点在logits计算后，见compute_gradient_ca2()内部实现
+                #   由于SIM+版本还引入DIM策略，此处传递给compute_gradient_ca2()的模型为合入了DIM变换的model_fn_dim()
                 grad = grad + compute_gradient_ca2(model_fn_dim, loss_fn, x_nes, y, targeted)
             grad = grad / sample_num
 
@@ -149,7 +136,7 @@ def transformation_d2a(x):
     :return: 根据D2A变换后的增强样本
     """
     # CA2.py中由于使用inception模型，样本均归一化到(-1,1). sample_variance的配置也作用在归一化后的样本上，文章实验显示最优配置为0.1
-    #   实则文中在(0,1)语境下表述，最优配置为0.05
+    #   文中在(0,1)语境下表述，最优配置为0.05
     # 本代码中本地使用ResNet50模型，样本为(0,255)，因此在应用D2A策略相关配置时，将样本先归一化到(0,1)，计算完在还原至(0,255)
     x = x / 255.0
 
@@ -171,7 +158,27 @@ def transformation_dim(x):
     :param x: 输入样本
     :return: 根据DIM变换后的增强样本
     """
-    return x
+    # 获取一个介于本地模型输入要的图像大小(image_resize)和图像原图大小(image_size)间的随机整数
+    rnd = tf.random.uniform((), image_resize, image_size, dtype=tf.int32)
+    # 获得随机数，后对输入样本进行随机resize变换
+    rescaled = tf.image.resize(x, [rnd, rnd], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    h_rem = image_size - rnd
+    w_rem = image_size - rnd
+    pad_top = tf.random.uniform((), 0, h_rem, dtype=tf.int32)
+    pad_bottom = h_rem - pad_top
+    pad_left = tf.random.uniform((), 0, w_rem, dtype=tf.int32)
+    pad_right = w_rem - pad_left
+    padded = tf.pad(rescaled, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]], constant_values=0.)
+    padded.set_shape((x.shape[0], image_size, image_size, 3))
+
+    # 此处用到了DIM算法的关键参数prod，还没有理解其作用
+    #   随机数<prod，则使用ret=padded，即采用上面的resize&padded后的样本
+    #   随机数>=prod，则使用原输入样本，ret=input_tensor
+    ret = tf.cond(tf.random.uniform(shape=[1])[0] < tf.constant(diverse_probability), lambda: padded, lambda: x)
+    # 在经过概率选择后，又进行了一次resize变换，重新调整会模型输入的要求大小
+    ret = tf.image.resize(ret, [image_resize, image_resize], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+    return ret
 
 
 @tf.function
@@ -198,7 +205,6 @@ def compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted):
 
         # 计算VME策略综合logits
         for i in range(stack_kernel_num):
-
             # 如果卷积核尺寸为1*1，则相当于不变，则无需真的进行卷积计算，直接累加原logits
             if list_stack_kernel_size[i] == 1:
                 logits = logits + base_logits
@@ -208,7 +214,7 @@ def compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted):
                 x_conv = tf.nn.depthwise_conv2d(x_nes, stack_kernel_list[i], strides=[1, 1, 1, 1], padding='SAME')
                 logits = logits + model_fn(x_conv)
 
-        # 计算SIM策略综合logits，共形成3个虚拟模型
+        # 计算SIM策略综合logits，共形成3个虚拟模型（分别使用1/2、1/4、1/8进行像素值缩放）
         for j in range(3):
             logits = logits + model_fn(x_nes * (1 / math.pow(2, j+1)))
 
