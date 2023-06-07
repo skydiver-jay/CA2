@@ -45,3 +45,12 @@ if __name__ == "__main__":
     print("ca2_sim_count: ", ca2_sim_count)
     print("ca2_basic_count: ", ca2_basic_count)
     print("mim_ro_count: ", mim_ro_count)
+
+    # base_dir = "images/"
+    # image_paths = os.listdir(base_dir)
+    #
+    # for image_path in image_paths:
+    #     sample_and_show(model, base_dir + image_path)
+    #
+    # print("original_img_count: ", len(image_paths))
+
