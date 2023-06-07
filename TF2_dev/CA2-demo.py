@@ -197,16 +197,6 @@ def mim_ro(path):
 
 if __name__ == "__main__":
 
-    # if attack_method == "CA2_SIM_TF2":
-    #     print("*********测试PLUS版本*********")
-    #     ca2_sim_tf2_demo()
-    # elif attack_method == "CA2_TF2":
-    #     print("*********测试BASIC版本*********")
-    #     ca2_tf2_demo()
-    # else:
-    #     print("*********测试MIM RO版本*********")
-    #     mim_ro("images/imagenet_01_559.jpg")
-
     image_paths = os.listdir("images")
     base_dir = "images/"
 
