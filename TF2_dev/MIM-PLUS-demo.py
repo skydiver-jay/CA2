@@ -5,7 +5,6 @@ from tensorflow.keras.applications import ResNet50
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
-import io, os
 
 import ref.use_define_samples, ref.utils_ditto
 import MIM_RO_V3, MIM_RO_V2, MIM_RO
