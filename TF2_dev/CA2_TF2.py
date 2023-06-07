@@ -138,7 +138,7 @@ def transformation_d2a(x):
     return x_nes
 
 
-@tf.function
+# @tf.function
 def compute_gradient_ca2(model_fn, loss_fn, x_nes, y, targeted):
     """
     计算应用SA策略后的综合梯度

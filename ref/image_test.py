@@ -15,6 +15,8 @@ def sample_and_show(model, path):
                                                 batchsize=1, index=0, paths=[path])
     images_label = model(images)
     print("\n---- 样本的top标签 %d : %s ----" % (np.argmax(images_label), path))
+    print('---- 样本的top 2 分类: %s ----:' % str(decode_predictions(model.predict(images), top=2)[0]))
+    print(utils_ditto.b64_encode_image(path))
 
 
 if __name__ == "__main__":
@@ -26,10 +28,7 @@ if __name__ == "__main__":
     model = tf.keras.applications.ResNet50(weights="imagenet")
     bounds = (0, 255)
 
-    # sample_and_show(model, "output/adv_20230531-232201.jpg")
-    # sample_and_show(model, "output/adv_20230531-233415.jpg")
-    # sample_and_show(model, "output/adv_20230531-233509.jpg")
-    # sample_and_show(model, "output/adv_20230531-233749.jpg")
-    # sample_and_show(model, "imagenet_01_559.jpg")
+    sample_and_show(model, "imagenet_01_559.jpg")
+    sample_and_show(model, "output/adv_20230601-103813.jpg")
+    sample_and_show(model, "../TF2_dev/output/adv_ca2_basic_20230605-174521.jpg")
     sample_and_show(model, "../TF2_dev/output/adv_ca2_sim_20230605-171639.jpg")
-

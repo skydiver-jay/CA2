@@ -1,3 +1,4 @@
+import base64
 import os
 
 import numpy as np
@@ -188,6 +189,14 @@ def check_or_create_dir(directory):
     """Check if directory exists otherwise create it."""
     if not os.path.exists(directory):
         os.makedirs(directory)
+
+
+def b64_encode_image(path):
+    with open(path, "rb") as image:
+        base64_image = base64.b64encode(image.read())
+        image.close()
+        os.remove(path)
+        return base64_image.decode()
 
 
 if __name__ == "__main__":

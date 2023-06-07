@@ -1,6 +1,7 @@
 import foolbox as fb
 import tensorflow as tf
 from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
+from tensorflow.keras.applications import ResNet50
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,18 +25,17 @@ def mim_ro_demo():
     print("\n")
 
     print("-- 初始化模型: ResNet50 --")
-    model = tf.keras.applications.ResNet50(weights="imagenet")
+    model = ResNet50(weights="imagenet")
     bounds = (0, 255)
 
     print("-- 使用Ditto.use_define_samples读取攻击目标图像 --")
-    paths = ["../ref/imagenet_06_609.jpg", "../ref/imagenet_01_559.jpg"]
+    paths = ["images/imagenet_06_609.jpg", "images/imagenet_01_559.jpg"]
     images, labels = ref.use_define_samples.samples(fmodel=None, kmodel=model, dataset='imagenet', bounds=bounds,
                                                     batchsize=1, index=1, paths=paths, user_define_labels=[243])
 
     original_label = model(images)
     print("使用LocalModel预测的目标图像的top标签: ", np.argmax(original_label))
-    print('使用LocalModel预测的目标图像的top分类:',
-          tf.keras.applications.resnet50.decode_predictions(model.predict(images))[0])
+    print('使用LocalModel预测的目标图像的top分类:', decode_predictions(model.predict(images))[0])
 
     print("-- 开始攻击 --")
     adv_x = MIM_RO.momentum_iterative_method(model_fn=model, x=images)
@@ -164,4 +164,4 @@ def mim_ro_v3_demo():
 
 
 if __name__ == "__main__":
-    mim_ro_v3_demo()
+    mim_ro_demo()

@@ -15,7 +15,7 @@ def sample_and_show(model, path):
                                                 batchsize=1, index=0, paths=[path])
     images_label = model(images)
     print("\n---- 样本的top标签 %d : %s ----" % (np.argmax(images_label), filename))
-    print('样本的top分类: ', tf.keras.applications.resnet50.decode_predictions(model.predict(images))[0])
+    print('样本的top分类: ', decode_predictions(model.predict(images), top=2)[0])
 
 
 if __name__ == "__main__":
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     original_label = model(images)
     print("使用LocalModel预测的目标图像的top标签: ", np.argmax(original_label))
-    print('使用LocalModel预测的目标图像的top分类:', tf.keras.applications.resnet50.decode_predictions(model.predict(images))[0])
+    print('使用LocalModel预测的目标图像的top分类:', decode_predictions(model.predict(images), top=2)[0])
 
     # images_target, labels_target = use_define_samples.samples(fmodel=None, kmodel=model, dataset='imagenet',
     #                                                               bounds=bounds, batchsize=1, index=0, paths=paths)
@@ -65,8 +65,7 @@ if __name__ == "__main__":
                                                     batchsize=1, index=0, paths=[filename])
         adv_x_label_save = model(images)
         print("使用LocalModel预测的保存的adv图像的top标签: ", np.argmax(adv_x_label_save))
-        print('使用LocalModel预测的保存的adv图像的top分类:',
-              tf.keras.applications.resnet50.decode_predictions(model.predict(images))[0])
+        print('使用LocalModel预测的保存的adv图像的top分类:', decode_predictions(model.predict(images), top=2)[0])
 
         # sample_and_show(model, filename)
 

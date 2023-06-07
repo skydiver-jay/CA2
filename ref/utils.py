@@ -169,7 +169,7 @@ def set_with_mask(x, x_other, mask):
 # Due to performance reasons, this function is wrapped inside of tf.function decorator.
 # Not using the decorator here, or letting the user wrap the attack in tf.function is way
 # slower on Tensorflow 2.0.0-alpha0.
-@tf.function
+# @tf.function
 def compute_gradient(model_fn, loss_fn, x, y, targeted):
     """
     Computes the gradient of the loss with respect to the input tensor.
