@@ -26,9 +26,10 @@ if __name__ == "__main__":
     model = tf.keras.applications.ResNet50(weights="imagenet")
     bounds = (0, 255)
 
-    sample_and_show(model, "output/adv_20230531-232201.jpg")
-    sample_and_show(model, "output/adv_20230531-233415.jpg")
-    sample_and_show(model, "output/adv_20230531-233509.jpg")
-    sample_and_show(model, "output/adv_20230531-233749.jpg")
-    sample_and_show(model, "imagenet_01_559.jpg")
+    # sample_and_show(model, "output/adv_20230531-232201.jpg")
+    # sample_and_show(model, "output/adv_20230531-233415.jpg")
+    # sample_and_show(model, "output/adv_20230531-233509.jpg")
+    # sample_and_show(model, "output/adv_20230531-233749.jpg")
+    # sample_and_show(model, "imagenet_01_559.jpg")
+    sample_and_show(model, "../TF2_dev/output/adv_ca2_sim_20230605-171639.jpg")
 
