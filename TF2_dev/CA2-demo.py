@@ -10,7 +10,7 @@ from utils_tf2 import *
 # else:
 #     import CA2_TF2
 
-attack_method = "MIM_RO"
+attack_method = "CA2_TF2"
 if attack_method == "CA2_SIM_TF2":
     import CA2_SIM_TF2
 elif attack_method == "CA2_TF2":
@@ -95,7 +95,7 @@ def ca2_sim_tf2_demo():
               tf.keras.applications.resnet50.decode_predictions(model.predict(images))[0])
 
 
-def ca2_tf2(path):
+def ca2_tf2(path, flag=None):
     print("-- 初始化模型: ResNet50 --")
     model = ResNet50(weights="imagenet")
     bounds = (0, 255)
@@ -121,7 +121,10 @@ def ca2_tf2(path):
 
     if is_adv(original_label, adv_x_label):
         check_or_create_dir("output")
-        filename = "output/adv_ca2_basic_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        if flag is not None:
+            filename = "output/adv_ca2_basic_" + flag + "_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        else:
+            filename = "output/adv_ca2_basic_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
         print(
             "\n---- 攻击得出的数字对抗样本的top标签 %d ，保存为文件: %s ----" % (int(np.argmax(adv_x_label)), filename))
         save_image(adv_x[0], filename)
@@ -131,7 +134,7 @@ def ca2_tf2(path):
         print('使用本地模型预测的保存的adv图像的top分类:', decode_predictions(model.predict(images))[0])
 
 
-def ca2_sim_tf2(path):
+def ca2_sim_tf2(path, flag=None):
     print("-- 初始化模型: ResNet50 --")
     model = ResNet50(weights="imagenet")
     bounds = (0, 255)
@@ -153,7 +156,10 @@ def ca2_sim_tf2(path):
 
     if is_adv(original_label, adv_x_label):
         check_or_create_dir("output")
-        filename = "output/adv_ca2_sim_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        if flag is not None:
+            filename = "output/adv_ca2_sim_" + flag + "_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        else:
+            filename = "output/adv_ca2_sim_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
         print(
             "\n---- 攻击得出的数字对抗样本的top标签 %d ，保存为文件: %s ----" % (int(np.argmax(adv_x_label)), filename))
         save_image(adv_x[0], filename)
@@ -163,7 +169,7 @@ def ca2_sim_tf2(path):
         print('使用本地模型预测的保存的adv图像的top分类:', decode_predictions(model.predict(images))[0])
 
 
-def mim_ro(path):
+def mim_ro(path, flag=None):
     print("-- 初始化模型: ResNet50 --")
     model = ResNet50(weights="imagenet")
     bounds = (0, 255)
@@ -185,7 +191,10 @@ def mim_ro(path):
 
     if is_adv(original_label, adv_x_label):
         check_or_create_dir("output")
-        filename = "output/adv_MIM_RO_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        if flag is not None:
+            filename = "output/adv_MIM_RO_" + flag + "_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
+        else:
+            filename = "output/adv_MIM_RO_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".jpg"
         print(
             "\n---- 攻击得出的数字对抗样本的top标签 %d ，保存为文件: %s ----" % (int(np.argmax(adv_x_label)), filename))
         save_image(adv_x[0], filename)
@@ -203,16 +212,18 @@ if __name__ == "__main__":
     count = 0
     total = len(image_paths)
 
-    for image_path in image_paths:
-        count += 1
-        print("\n\n*********攻击开始( %d / %d)：%s*********" % (count, total, image_path))
-        if attack_method == "CA2_SIM_TF2":
-            print("*********使用PLUS版本攻击*********")
-            ca2_sim_tf2(base_dir + image_path)
-        elif attack_method == "CA2_TF2":
-            print("*********使用BASIC版本攻击*********")
-            ca2_tf2(base_dir + image_path)
-        else:
-            print("*********使用MIM RO版本攻击*********")
-            mim_ro(base_dir + image_path)
-        print("*********攻击结束( %d / %d)：%s*********\n\n" % (count, total, image_path))
+    # for image_path in image_paths:
+    #     count += 1
+    #     print("\n\n*********攻击开始( %d / %d)：%s*********" % (count, total, image_path))
+    #     if attack_method == "CA2_SIM_TF2":
+    #         print("*********使用PLUS版本攻击*********")
+    #         ca2_sim_tf2(base_dir + image_path)
+    #     elif attack_method == "CA2_TF2":
+    #         print("*********使用BASIC版本攻击*********")
+    #         ca2_tf2(base_dir + image_path)
+    #     else:
+    #         print("*********使用MIM RO版本攻击*********")
+    #         mim_ro(base_dir + image_path)
+    #     print("*********攻击结束( %d / %d)：%s*********\n\n" % (count, total, image_path))
+
+    ca2_tf2(base_dir + "imagenet_13_471.jpg", flag="13_471_alone")

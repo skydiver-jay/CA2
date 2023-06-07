@@ -32,19 +32,19 @@ if __name__ == "__main__":
     ca2_basic_count = 0
     mim_ro_count = 0
 
-    for adv_path in adv_paths:
-        if "20230607" in adv_path:
-            if "ca2_sim" in adv_path:
-                ca2_sim_count += 1
-            elif "ca2_basic" in adv_path:
-                ca2_basic_count += 1
-            elif "MIM_RO" in adv_path:
-                mim_ro_count += 1
-            sample_and_show(model, base_dir + adv_path)
-
-    print("ca2_sim_count: ", ca2_sim_count)
-    print("ca2_basic_count: ", ca2_basic_count)
-    print("mim_ro_count: ", mim_ro_count)
+    # for adv_path in adv_paths:
+    #     if "20230607" in adv_path:
+    #         if "ca2_sim" in adv_path:
+    #             ca2_sim_count += 1
+    #         elif "ca2_basic" in adv_path:
+    #             ca2_basic_count += 1
+    #         elif "MIM_RO" in adv_path:
+    #             mim_ro_count += 1
+    #         sample_and_show(model, base_dir + adv_path)
+    #
+    # print("ca2_sim_count: ", ca2_sim_count)
+    # print("ca2_basic_count: ", ca2_basic_count)
+    # print("mim_ro_count: ", mim_ro_count)
 
     # base_dir = "images/"
     # image_paths = os.listdir(base_dir)
@@ -53,4 +53,6 @@ if __name__ == "__main__":
     #     sample_and_show(model, base_dir + image_path)
     #
     # print("original_img_count: ", len(image_paths))
+
+    sample_and_show(model, "output/adv_ca2_basic_13_471_alone_20230607-235330.jpg")
 
