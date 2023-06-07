@@ -195,7 +195,6 @@ def b64_encode_image(path):
     with open(path, "rb") as image:
         base64_image = base64.b64encode(image.read())
         image.close()
-        os.remove(path)
         return base64_image.decode()
 
 
