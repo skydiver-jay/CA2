@@ -130,7 +130,7 @@ def samples(
     :param index: 待读取的图像起始索引
     :param batchsize: 待读取图像的数量
     :param shape: 如需调整图像大小，设置shape为目标大小，如(224,224)
-    :param data_format: 默认为channels_last
+    :param data_format: (弃用参数) 默认为channels_last
     :param bounds: 数值范围，默认为(0, 255)
     :param paths: 待读取的图像文件路径列表
     :returns:
@@ -148,18 +148,22 @@ def samples(
         # open file
         image = Image.open(file)
 
+        # 转换图像模式
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
         if shape is not None:
             image = image.resize(shape)
 
         image = np.asarray(image, dtype=np.float32)
 
-        if image.ndim == 2:
-            image = image[..., np.newaxis]
-
-        assert image.ndim == 3
-
-        if data_format == "channels_first":
-            image = np.transpose(image, (2, 0, 1))
+        # if image.ndim == 2:
+        #     image = image[..., np.newaxis]
+        #
+        # assert image.ndim == 3
+        #
+        # if data_format == "channels_first":
+        #     image = np.transpose(image, (2, 0, 1))
 
         images.append(image)
 

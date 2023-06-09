@@ -1,5 +1,6 @@
 import foolbox as fb
 import tensorflow as tf
+from PIL import Image
 from tensorflow.keras.applications.resnet50 import decode_predictions
 from tensorflow.keras.applications import ResNet50
 from datetime import datetime
@@ -18,13 +19,38 @@ def sample_and_show(model, path):
     print(utils_tf2.b64_encode_image(path))
 
 
-if __name__ == "__main__":
-    print("TensorFlow版本: %s\n" % tf.__version__)
+def check(input_image_name, std_image_name):
+    try:
+        input_image = Image.open(input_image_name)
+        std_image = Image.open(std_image_name)
+    except:
+        print("[-]give me a real image!!")
+        return False
+    input_image_np = np.array(input_image)
+    std_image_np = np.array(std_image)
+    input_x = len(input_image_np)
+    input_y = len(input_image_np[0])
+    input_z = len(input_image_np[0][0])
+    std_x = len(std_image_np)
+    std_y = len(std_image_np[0])
+    std_z = len(std_image_np[0][0])
+    if std_x != input_x or std_y != input_y or std_z != input_z:
+        return False
+    diff = 0
+    for i in range(input_x):
+        for j in range(input_y):
+            for k in range(input_z):
+                if input_image_np[i][j][k] > std_image_np[i][j][k]:
+                    diff += input_image_np[i][j][k] - std_image_np[i][j][k]
+                else:
+                    diff += std_image_np[i][j][k] - input_image_np[i][j][k]
+    diff = diff / (input_x * input_y * input_z)
+    if diff > 0.8:
+        return False
+    return True
 
-    print("---- 初始化模型: ResNet50 ----")
-    model = ResNet50(weights="imagenet")
-    bounds = (0, 255)
 
+def shiyan_1():
     base_dir = "output/"
     adv_paths = os.listdir(base_dir)
 
@@ -54,5 +80,20 @@ if __name__ == "__main__":
     #
     # print("original_img_count: ", len(image_paths))
 
-    sample_and_show(model, "output/adv_ca2_basic_13_471_alone_20230607-235330.jpg")
 
+if __name__ == "__main__":
+    print("TensorFlow版本: %s\n" % tf.__version__)
+
+    print("---- 初始化模型: ResNet50 ----")
+    model = ResNet50(weights="imagenet")
+    bounds = (0, 255)
+
+    base_dir = "output/"
+    adv_paths = os.listdir(base_dir)
+
+    # images = utils_tf2.samples(bounds=(0, 255), batchsize=1, index=0, paths=["images/adv_MIM_RO_V3_20230602-112529.jpg"], shape=(224, 224))
+    # std_images = utils_tf2.samples(bounds=(0, 255), batchsize=1, index=0, paths=["images/imagenet_01_559_size_224_224.jpg"], shape=(224, 224))
+    # utils_tf2.save_image(images[0], "output/imagenet_01_559_size_224_224.jpg")
+
+    # sample_and_show(model, "output/adv_MIM_RO_V3_20230602-112529.jpg")
+    print(check("output/adv_MIM_RO_V3_20230602-112529.jpg", "output/imagenet_01_559_size_224_224.jpg"))
